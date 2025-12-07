@@ -305,7 +305,7 @@
             const g = audioContext.createGain();
             osc.connect(g);
             g.connect(audioContext.destination);
-            osc.frequency.value = 800;
+            osc.frequency.value = 1500;
             osc.start();
             g.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 2.5);
             osc.stop(audioContext.currentTime + 2.5);
@@ -313,6 +313,7 @@
     </script>
 </body>
 </html>
+
 
 
 
