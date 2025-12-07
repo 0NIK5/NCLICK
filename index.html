@@ -116,7 +116,7 @@
                 // Он убирает гул и оставляет только резкие "цыкающие" звуки
                 const filter = audioContext.createBiquadFilter();
                 filter.type = "highpass";
-                filter.frequency.value = 1000; // Отрезаем всё, что ниже 1000 Гц
+                filter.frequency.value = 10000; // Отрезаем всё, что ниже 1000 Гц
 
                 microphone = audioContext.createMediaStreamSource(stream);
                 analyser = audioContext.createAnalyser();
@@ -218,4 +218,5 @@
 </body>
 
 </html>
+
 
