@@ -52,21 +52,21 @@
         
         <div class="info-row" style="color:#2ecc71; margin-top: 10px;">
             <span>**1. НИЖНЯЯ ГРАНИЦА (Low-Cut Filter)**</span>
-            <span id="lowcutHzVal">1500 Hz</span>
+            <span id="lowcutHzVal">2500 Hz</span>
         </div>
         <div class="controls-row">
             <span>500 Hz</span>
-            <input type="range" id="highpassSlider" min="500" max="5000" step="100" value="1500" oninput="updateFilters()">
+            <input type="range" id="highpassSlider" min="500" max="5000" step="100" value="2500" oninput="updateFilters()">
             <span>5000 Hz</span>
         </div>
         
         <div class="info-row" style="color:#e74c3c; margin-top: 15px;">
             <span>**2. ВЕРХНЯЯ ГРАНИЦА (High-Cut Filter)**</span>
-            <span id="highcutHzVal">15000 Hz</span>
+            <span id="highcutHzVal">5000 Hz</span>
         </div>
         <div class="controls-row">
             <span>5000 Hz</span>
-            <input type="range" id="lowpassSlider" min="5000" max="20000" step="500" value="15000" oninput="updateFilters()">
+            <input type="range" id="lowpassSlider" min="5000" max="20000" step="500" value="5000" oninput="updateFilters()">
             <span>20000 Hz</span>
         </div>
         
@@ -313,6 +313,7 @@
     </script>
 </body>
 </html>
+
 
 
 
