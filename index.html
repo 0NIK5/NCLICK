@@ -3,221 +3,312 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Счетчик Эспандера</title>
+    <title>Анализатор Эспандера v3 (Band-Pass)</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; text-align: center; background: #f4f4f9; color: #333; display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
-        h1 { margin-bottom: 10px; }
+        body { font-family: 'Segoe UI', sans-serif; text-align: center; background: #222; color: #eee; display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; padding: 10px; }
         
         /* Счетчик */
-        .counter-box { font-size: 120px; font-weight: bold; color: #2c3e50; margin: 20px 0; line-height: 1; transition: color 0.2s; }
-        .counter-box.limit { color: #e74c3c; } /* Красный цвет при достижении цели */
+        .counter-box { font-size: 80px; font-weight: bold; color: #fff; margin: 10px 0; }
+        .counter-box.limit { color: #e74c3c; text-shadow: 0 0 20px red; }
 
-        /* Панель настроек */
-        .controls { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
+        /* Контейнер настроек */
+        .panel { background: #333; padding: 15px; border-radius: 10px; width: 95%; max-width: 600px; margin-bottom: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
         
-        .row { margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between; }
-        label { font-weight: 600; }
-        input[type="number"] { width: 60px; padding: 5px; font-size: 18px; text-align: center; }
+        canvas { background: #000; border-radius: 4px; width: 100%; height: 150px; border: 1px solid #444; display: block; }
 
-        /* Визуализатор звука */
-        .visualizer-container {
-            width: 100%; height: 40px; background: #ddd; border-radius: 20px; position: relative; overflow: hidden; margin-top: 10px;
-        }
-        /* Синяя полоска громкости */
-        #volume-bar {
-            height: 100%; width: 0%; background: #3498db; transition: width 0.05s ease-out;
-        }
-        /* Красная линия порога */
-        #threshold-line {
-            position: absolute; top: 0; bottom: 0; width: 4px; background: #e74c3c; left: 50%; z-index: 10; cursor: col-resize;
-        }
+        .info-row { display: flex; justify-content: space-between; font-size: 14px; color: #aaa; margin-bottom: 5px; }
+        .peak-hz { color: #00ff00; font-weight: bold; }
+
+        .controls-row { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
+        input[type="range"] { flex-grow: 1; margin: 0 10px; cursor: pointer; }
         
-        input[type="range"] { width: 100%; cursor: pointer; }
-
-        /* Кнопки */
-        .btn { padding: 15px 30px; font-size: 18px; border: none; border-radius: 8px; cursor: pointer; color: white; margin: 5px; transition: 0.2s; }
-        .btn-start { background: #27ae60; }
-        .btn-start:hover { background: #219150; }
-        .btn-reset { background: #95a5a6; }
-        .btn-reset:hover { background: #7f8c8d; }
-
-        .status { font-size: 14px; color: #777; margin-top: 10px; min-height: 20px;}
+        button { padding: 10px 20px; font-size: 16px; border: none; border-radius: 5px; cursor: pointer; color: white; margin-top: 10px;}
+        .btn-start { background: #27ae60; width: 100%; }
+        .btn-reset { background: #555; }
+        
+        .status { margin-top: 10px; color: #888; font-size: 12px; }
     </style>
 </head>
 <body>
 
-    <h1>Счетчик Эспандера</h1>
+    <h1>Анализатор Эспандера 🔬</h1>
 
     <div class="counter-box" id="counterDisplay">0</div>
 
-    <div class="controls">
-        <div class="row">
-            <label>Цель повторений:</label>
-            <input type="number" id="targetInput" value="21">
+    <div class="panel">
+        <div class="info-row">
+            <span>Басы (Low)</span>
+            <span>Спектр звука</span>
+            <span>Высокие (High)</span>
         </div>
+        <canvas id="spectrumCanvas"></canvas>
+        <div class="info-row" style="margin-top: 5px;">
+            <span>Пиковая частота (Max Hz): <span class="peak-hz" id="peakHzDisplay">0 Hz</span></span>
+        </div>
+    </div>
 
-        <hr>
-
-        <div class="row" style="display:block; text-align:left;">
-            <label>Чувствительность (Порог срабатывания):</label>
+    <div class="panel">
+        <h2>Настройка Частотного Диапазона (Band-Pass)</h2>
+        
+        <div class="info-row" style="color:#2ecc71; margin-top: 10px;">
+            <span>**1. НИЖНЯЯ ГРАНИЦА (Low-Cut Filter)**</span>
+            <span id="lowcutHzVal">1500 Hz</span>
+        </div>
+        <div class="controls-row">
+            <span>500 Hz</span>
+            <input type="range" id="highpassSlider" min="500" max="5000" step="100" value="1500" oninput="updateFilters()">
+            <span>5000 Hz</span>
+        </div>
+        
+        <div class="info-row" style="color:#e74c3c; margin-top: 15px;">
+            <span>**2. ВЕРХНЯЯ ГРАНИЦА (High-Cut Filter)**</span>
+            <span id="highcutHzVal">15000 Hz</span>
+        </div>
+        <div class="controls-row">
+            <span>5000 Hz</span>
+            <input type="range" id="lowpassSlider" min="5000" max="20000" step="500" value="15000" oninput="updateFilters()">
+            <span>20000 Hz</span>
+        </div>
+        
+        <div class="status" style="margin-top: 10px;">
+            Счетчик будет реагировать только на звук **между** этими двумя частотами.
+        </div>
+    </div>
+    
+    <div class="panel">
+        <h2>Настройка Громкости</h2>
+        <div class="info-row">
+            <span>3. Порог громкости (Чувствительность)</span>
+            <span id="thresholdVal">30</span>
+        </div>
+        <div class="controls-row">
+            <span>0</span>
             <input type="range" id="thresholdSlider" min="0" max="100" value="30">
+            <span>100</span>
         </div>
         
-        <div class="visualizer-container">
-            <div id="volume-bar"></div>
-            <div id="threshold-line" style="left: 30%;"></div>
+        <div style="margin-top: 10px; height: 10px; background: #444; border-radius: 5px; overflow: hidden; position: relative;">
+            <div id="currentVolumeBar" style="width: 0%; height: 100%; background: #3498db; transition: width 0.05s;"></div>
+            <div id="thresholdMarker" style="position: absolute; left: 30%; top: 0; bottom: 0; width: 2px; background: #e74c3c; z-index: 2;"></div>
         </div>
-        <div style="font-size: 12px; color: #888; margin-top: 5px;">
-            Синяя полоска должна прыгать ЗА красную линию только при щелчке.
-        </div>
+    </div>
 
-        <hr>
-
-        <button class="btn btn-start" id="startBtn" onclick="initAudio()">🎤 Включить микрофон</button>
-        <button class="btn btn-reset" onclick="resetCounter()">Сброс (0)</button>
-        
-        <div class="status" id="statusText">Нажми "Включить микрофон" для начала</div>
+    <div class="panel">
+        <label>Цель повторений: <input type="number" id="targetInput" value="20" style="width: 50px; text-align: center; background: #444; color: white; border: none; padding: 5px;"></label>
+        <br>
+        <button class="btn-start" id="startBtn" onclick="initAudio()">▶ Включить микрофон</button>
+        <button class="btn-reset" onclick="resetCounter()" style="width: 100%; margin-top: 5px;">Сброс счетчика</button>
+        <div class="status" id="statusText">Ожидание...</div>
     </div>
 
     <script>
         let audioContext;
         let analyser;
         let microphone;
+        let highpassFilter; // Фильтр для нижней границы (Low-Cut)
+        let lowpassFilter;  // Фильтр для верхней границы (High-Cut)
         let isListening = false;
+        
         let count = 0;
         let lastClapTime = 0;
-        
-        // Настройки
-        const COOLDOWN = 650; // Пауза в мс после щелчка (чтобы не считало двойной удар)
-        
-        // Элементы UI
+        const COOLDOWN = 300; 
+
+        // UI Элементы
+        const canvas = document.getElementById('spectrumCanvas');
+        const ctx = canvas.getContext('2d');
+        const peakHzDisplay = document.getElementById('peakHzDisplay');
         const counterDisplay = document.getElementById('counterDisplay');
-        const volumeBar = document.getElementById('volume-bar');
-        const thresholdLine = document.getElementById('threshold-line');
+        const volumeBar = document.getElementById('currentVolumeBar');
+        
+        const highpassSlider = document.getElementById('highpassSlider');
+        const lowpassSlider = document.getElementById('lowpassSlider');
+        const lowcutHzVal = document.getElementById('lowcutHzVal');
+        const highcutHzVal = document.getElementById('highcutHzVal');
+
         const thresholdSlider = document.getElementById('thresholdSlider');
+        const thresholdMarker = document.getElementById('thresholdMarker');
+        const thresholdVal = document.getElementById('thresholdVal');
+
         const statusText = document.getElementById('statusText');
         const startBtn = document.getElementById('startBtn');
         const targetInput = document.getElementById('targetInput');
 
-        // Обновление положения красной линии при сдвиге ползунка
+        canvas.width = 600;
+        canvas.height = 150;
+
+        // --- УПРАВЛЕНИЕ ПОЛЗУНКАМИ ---
+
+        // Обновление ползунка Порога Громкости
         thresholdSlider.oninput = function() {
-            thresholdLine.style.left = this.value + '%';
+            thresholdMarker.style.left = this.value + '%';
+            thresholdVal.innerText = this.value;
         }
+
+        // Обновление Частотных Фильтров
+        function updateFilters() {
+            const newHighpassFreq = parseInt(highpassSlider.value);
+            const newLowpassFreq = parseInt(lowpassSlider.value);
+
+            lowcutHzVal.innerText = newHighpassFreq + " Hz";
+            highcutHzVal.innerText = newLowpassFreq + " Hz";
+
+            // Проверка на корректность диапазона
+            if (newHighpassFreq >= newLowpassFreq) {
+                // Если нижняя граница выше верхней, мы инвертируем настройки
+                lowcutHzVal.style.color = '#e74c3c';
+                highcutHzVal.style.color = '#e74c3c';
+                statusText.innerText = "ВНИМАНИЕ: Границы фильтра пересекаются!";
+            } else {
+                lowcutHzVal.style.color = '#2ecc71';
+                highcutHzVal.style.color = '#e74c3c';
+                if (isListening) statusText.innerText = "Анализ запущен...";
+            }
+
+
+            if (highpassFilter && lowpassFilter) {
+                // Меняем частоты среза в реальном времени
+                highpassFilter.frequency.setValueAtTime(newHighpassFreq, audioContext.currentTime);
+                lowpassFilter.frequency.setValueAtTime(newLowpassFreq, audioContext.currentTime);
+            }
+        }
+        highpassSlider.oninput = updateFilters;
+        lowpassSlider.oninput = updateFilters;
+
+        // --- ИНИЦИАЛИЗАЦИЯ АУДИО ---
 
         async function initAudio() {
             if (isListening) return;
-
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 
-                // Создаем фильтр высоких частот (High-pass filter)
-                // Он убирает гул и оставляет только резкие "цыкающие" звуки
-                const filter = audioContext.createBiquadFilter();
-                filter.type = "highpass";
-                filter.frequency.value = 10000; // Отрезаем всё, что ниже 1000 Гц
-
-                microphone = audioContext.createMediaStreamSource(stream);
+                // 1. Фильтр High-Pass (Low-Cut)
+                highpassFilter = audioContext.createBiquadFilter();
+                highpassFilter.type = "highpass";
+                highpassFilter.frequency.value = parseInt(highpassSlider.value); 
+                
+                // 2. Фильтр Low-Pass (High-Cut)
+                lowpassFilter = audioContext.createBiquadFilter();
+                lowpassFilter.type = "lowpass";
+                lowpassFilter.frequency.value = parseInt(lowpassSlider.value);
+                
                 analyser = audioContext.createAnalyser();
-                analyser.fftSize = 512; // Размер буфера для анализа
-
-                // Цепочка: Микрофон -> Фильтр -> Анализатор
-                microphone.connect(filter);
-                filter.connect(analyser);
+                analyser.fftSize = 2048; 
+                
+                microphone = audioContext.createMediaStreamSource(stream);
+                
+                // 3. Сборка Цепочки: Микрофон -> HP-Filter -> LP-Filter -> Анализатор
+                microphone.connect(highpassFilter); 
+                highpassFilter.connect(lowpassFilter);
+                lowpassFilter.connect(analyser); // Анализатор получает только отфильтрованный звук
 
                 isListening = true;
-                startBtn.style.display = 'none'; // Скрываем кнопку
-                statusText.innerText = "Слушаю... Сожми эспандер!";
+                startBtn.style.display = 'none';
+                statusText.innerText = "Анализ запущен...";
                 
-                detectSound();
-
+                draw(); // Запуск цикла отрисовки и детекции
             } catch (err) {
-                statusText.innerText = "Ошибка: Доступ к микрофону запрещен.";
                 console.error(err);
+                alert("Ошибка микрофона: " + err);
             }
         }
 
-        function detectSound() {
+        // --- ЦИКЛ ОТРИСОВКИ И ДЕТЕКЦИИ ---
+        function draw() {
             if (!isListening) return;
+            requestAnimationFrame(draw);
 
-            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
             analyser.getByteFrequencyData(dataArray);
 
-            // Вычисляем среднюю громкость высоких частот
-            let sum = 0;
-            for (let i = 0; i < dataArray.length; i++) {
-                sum += dataArray[i];
+            // Отрисовка спектра
+            ctx.fillStyle = 'rgb(20, 20, 20)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const barWidth = (canvas.width / bufferLength) * 2.5;
+            let barHeight;
+            let x = 0;
+            let maxVol = 0;
+            let maxIndex = 0;
+            let totalVol = 0;
+
+            for(let i = 0; i < bufferLength; i++) {
+                barHeight = dataArray[i];
+                if (barHeight > maxVol) {
+                    maxVol = barHeight;
+                    maxIndex = i;
+                }
+                totalVol += barHeight;
+
+                // Рисуем бары
+                ctx.fillStyle = 'rgb(' + (barHeight + 50) + ',150,50)';
+                ctx.fillRect(x, canvas.height - barHeight / 2, barWidth, barHeight / 2);
+
+                x += barWidth + 1;
             }
-            let average = sum / dataArray.length;
+
+            // Вычисление Пиковой частоты
+            const nyquist = audioContext.sampleRate / 2;
+            const hzPerBin = nyquist / bufferLength;
+            const dominantHz = Math.round(maxIndex * hzPerBin);
+
+            if (maxVol > 30) {
+                peakHzDisplay.innerText = dominantHz + " Hz";
+            } else {
+                peakHzDisplay.innerText = "...";
+            }
+
+            // Логика счетчика (основана на средней громкости уже ОТФИЛЬТРОВАННОГО сигнала)
+            let averageVol = totalVol / bufferLength;
+            let visualVol = averageVol * 3;
+            if (visualVol > 100) visualVol = 100;
             
-            // Усиливаем значение для наглядности (умножаем на коэффициент)
-            let visualValue = average * 3; 
-            if (visualValue > 100) visualValue = 100;
+            volumeBar.style.width = visualVol + '%';
 
-            // Обновляем синюю полоску
-            volumeBar.style.width = visualValue + '%';
-
-            // Проверка на удар
-            let threshold = thresholdSlider.value;
+            let threshold = parseInt(thresholdSlider.value);
             let now = Date.now();
 
-            // ЕСЛИ громкость выше порога И прошло время задержки (COOLDOWN)
-            if (visualValue > threshold && (now - lastClapTime > COOLDOWN)) {
-                
-                count++;
-                updateCounterUI();
+            if (visualVol > threshold && (now - lastClapTime > COOLDOWN)) {
+                triggerCount();
                 lastClapTime = now;
-                
-                // Визуальный эффект "вспышки" на полоске
-                volumeBar.style.backgroundColor = '#2ecc71';
-                setTimeout(() => volumeBar.style.backgroundColor = '#3498db', 100);
             }
-
-            requestAnimationFrame(detectSound);
         }
 
-        function updateCounterUI() {
+        // --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
+        function triggerCount() {
+            count++;
             counterDisplay.innerText = count;
-            const target = parseInt(targetInput.value);
+            
+            volumeBar.style.backgroundColor = '#fff';
+            setTimeout(() => volumeBar.style.backgroundColor = '#3498db', 100);
 
+            const target = parseInt(targetInput.value);
             if (count >= target) {
                 counterDisplay.classList.add('limit');
-                statusText.innerText = "Цель достигнута! Смени руку.";
-                playBeep(); // Звуковой сигнал
-            } else {
-                counterDisplay.classList.remove('limit');
-                statusText.innerText = "Слушаю...";
+                statusText.innerText = "ЦЕЛЬ ДОСТИГНУТА! Смени руку.";
+                playBeep();
             }
         }
 
         function resetCounter() {
             count = 0;
+            counterDisplay.innerText = "0";
             counterDisplay.classList.remove('limit');
-            updateCounterUI();
-            statusText.innerText = isListening ? "Слушаю..." : "Счетчик сброшен";
+            statusText.innerText = "Счетчик сброшен";
         }
 
-        // Синтез звука "Бип" без внешних файлов
         function playBeep() {
             if (!audioContext) return;
             const osc = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
-
-            osc.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-
-            osc.type = 'sine';
-            osc.frequency.value = 880; // Нота Ля (высокий писк)
-            
+            const g = audioContext.createGain();
+            osc.connect(g);
+            g.connect(audioContext.destination);
+            osc.frequency.value = 800;
             osc.start();
-            gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.5);
+            g.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.5);
             osc.stop(audioContext.currentTime + 0.5);
         }
     </script>
 </body>
-
 </html>
-
-
-
