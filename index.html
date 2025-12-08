@@ -23,8 +23,8 @@
         input[type="range"] { flex-grow: 1; margin: 0 8px; cursor: pointer; }
         
         button { padding: 6px 12px; font-size: 13px; border: none; border-radius: 5px; cursor: pointer; color: white; margin-top: 5px;}
-        .btn-start { background: #27ae60; width: 100%; }
-        .btn-reset { background: #555; }
+        .btn-start { background: #27ae60; width: 30%; }
+        .btn-reset { background: #555;  }
         
         .status { margin-top: 5px; color: #888; font-size: 11px; }
         
@@ -59,8 +59,8 @@
         </div>
         <div class="controls-row">
             <span>500 Hz</span>
-            <input type="range" id="highpassSlider" min="500" max="5000" step="100" value="2500" oninput="updateFilters()">
-            <span>5000 Hz</span>
+            <input type="range" id="highpassSlider" min="500" max="10000" step="100" value="2500" oninput="updateFilters()">
+            <span>10000 Hz</span>
         </div>
         
         <div class="info-row" style="color:#e74c3c; margin-top: 15px;">
@@ -68,8 +68,8 @@
             <span id="highcutHzVal">5000 Hz</span>
         </div>
         <div class="controls-row">
-            <span>5000 Hz</span>
-            <input type="range" id="lowpassSlider" min="5000" max="20000" step="500" value="5000" oninput="updateFilters()">
+            <span>2500 Hz</span>
+            <input type="range" id="lowpassSlider" min="2500" max="20000" step="100" value="5000" oninput="updateFilters()">
             <span>20000 Hz</span>
         </div>
         
@@ -100,7 +100,9 @@
         <label>Цель повторений: <input type="number" id="targetInput" value="20" style="width: 50px; text-align: center; background: #444; color: white; border: none; padding: 5px;"></label>
         <br>
         <button class="btn-start" id="startBtn" onclick="initAudio()">▶ Включить микрофон</button>
-        <button class="btn-reset" onclick="resetCounter()" style="width: 100%; margin-top: 5px;">Сброс счетчика</button>
+        <button class="btn-reset" onclick="resetCounter()" style="width: 30%; margin-top: 5px;">Сброс счетчика</button>
+        <button class="btn-reset" onclick="isListening = false; startBtn.style.display = 'block';" style="width: 30%; margin-top: 5px;">Stop</button>
+        
         <div class="status" id="statusText">Ожидание...</div>
     </div>
 
