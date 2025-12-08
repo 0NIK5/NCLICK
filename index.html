@@ -23,7 +23,7 @@
         input[type="range"] { flex-grow: 1; margin: 0 8px; cursor: pointer; }
         
         button { padding: 6px 12px; font-size: 13px; border: none; border-radius: 5px; cursor: pointer; color: white; margin-top: 5px;}
-        .btn-start { background: #27ae60; width: 30%; }
+        .btn-start { background: #27ae60; width: 100%; }
         .btn-reset { background: #555;  }
         
         .status { margin-top: 5px; color: #888; font-size: 11px; }
@@ -100,8 +100,8 @@
         <label>Цель повторений: <input type="number" id="targetInput" value="20" style="width: 50px; text-align: center; background: #444; color: white; border: none; padding: 5px;"></label>
         <br>
         <button class="btn-start" id="startBtn" onclick="initAudio()">▶ Включить микрофон</button>
-        <button class="btn-reset" onclick="resetCounter()" style="width: 30%; margin-top: 5px;">Сброс счетчика</button>
-        <button class="btn-reset" onclick="isListening = false; startBtn.style.display = 'block';" style="width: 30%; margin-top: 5px;">Stop</button>
+        <button class="btn-reset" onclick="resetCounter()" style="width: 100%; margin-top: 5px;">Сброс счетчика</button>
+        <button class="btn-reset" onclick="isListening = false; startBtn.style.display = 'block';" style="width: 100%; margin-top: 5px;">Stop</button>
         
         <div class="status" id="statusText">Ожидание...</div>
     </div>
