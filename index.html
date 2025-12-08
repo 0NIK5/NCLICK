@@ -55,12 +55,12 @@
         
         <div class="info-row" style="color:#2ecc71; margin-top: 10px;">
             <span>**1. НИЖНЯЯ ГРАНИЦА (Low-Cut Filter)**</span>
-            <span id="lowcutHzVal">2500 Hz</span>
+            <span id="lowcutHzVal">2100 Hz</span>
         </div>
         <div class="controls-row">
-            <span>500 Hz</span>
-            <input type="range" id="highpassSlider" min="500" max="10000" step="100" value="2500" oninput="updateFilters()">
-            <span>10000 Hz</span>
+            <span>100 Hz</span>
+            <input type="range" id="highpassSlider" min="100" max="15000" step="100" value="2100" oninput="updateFilters()">
+            <span>15000 Hz</span>
         </div>
         
         <div class="info-row" style="color:#e74c3c; margin-top: 15px;">
@@ -68,8 +68,8 @@
             <span id="highcutHzVal">5000 Hz</span>
         </div>
         <div class="controls-row">
-            <span>2500 Hz</span>
-            <input type="range" id="lowpassSlider" min="2500" max="20000" step="100" value="5000" oninput="updateFilters()">
+            <span>2000 Hz</span>
+            <input type="range" id="lowpassSlider" min="2000" max="20000" step="100" value="5000" oninput="updateFilters()">
             <span>20000 Hz</span>
         </div>
         
@@ -110,13 +110,16 @@
         let audioContext;
         let analyser;
         let microphone;
-        let highpassFilter; // Фильтр для нижней границы (Low-Cut)
-        let lowpassFilter;  // Фильтр для верхней границы (High-Cut)
+        let scriptProcessor;
         let isListening = false;
         
         let count = 0;
         let lastClapTime = 0;
-        const COOLDOWN = 600; 
+        const COOLDOWN = 600;
+        
+        // Для анализа во временной области
+        let audioBuffer = [];
+        let detectedFrequency = 0;
 
         // UI Элементы
         const canvas = document.getElementById('spectrumCanvas');
@@ -151,30 +154,27 @@
 
         // Обновление Частотных Фильтров
         function updateFilters() {
-            const newHighpassFreq = parseInt(highpassSlider.value);
-            const newLowpassFreq = parseInt(lowpassSlider.value);
-
-            lowcutHzVal.innerText = newHighpassFreq + " Hz";
-            highcutHzVal.innerText = newLowpassFreq + " Hz";
+            let newHighpassFreq = parseInt(highpassSlider.value);
+            let newLowpassFreq = parseInt(lowpassSlider.value);
 
             // Проверка на корректность диапазона
             if (newHighpassFreq >= newLowpassFreq) {
-                // Если нижняя граница выше верхней, мы инвертируем настройки
+                // Если нижняя граница >= верхней, скорректировать нижнюю
+                newHighpassFreq = newLowpassFreq - 1000;
+                if (newHighpassFreq < 100) newHighpassFreq = 100;
+                highpassSlider.value = newHighpassFreq;
+                
                 lowcutHzVal.style.color = '#e74c3c';
                 highcutHzVal.style.color = '#e74c3c';
-                statusText.innerText = "ВНИМАНИЕ: Границы фильтра пересекаются!";
+                statusText.innerText = "⚠️ Границы пересекаются! Автокоррекция...";
             } else {
                 lowcutHzVal.style.color = '#2ecc71';
                 highcutHzVal.style.color = '#e74c3c';
-                if (isListening) statusText.innerText = "Анализ запущен...";
+                if (isListening) statusText.innerText = "✓ Анализ запущен...";
             }
 
-
-            if (highpassFilter && lowpassFilter) {
-                // Меняем частоты среза в реальном времени
-                highpassFilter.frequency.setValueAtTime(newHighpassFreq, audioContext.currentTime);
-                lowpassFilter.frequency.setValueAtTime(newLowpassFreq, audioContext.currentTime);
-            }
+            lowcutHzVal.innerText = newHighpassFreq + " Hz";
+            highcutHzVal.innerText = newLowpassFreq + " Hz";
         }
         highpassSlider.oninput = updateFilters;
         lowpassSlider.oninput = updateFilters;
@@ -187,96 +187,177 @@
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 
-                // 1. Фильтр High-Pass (Low-Cut)
-                highpassFilter = audioContext.createBiquadFilter();
-                highpassFilter.type = "highpass";
-                highpassFilter.frequency.value = parseInt(highpassSlider.value); 
-                
-                // 2. Фильтр Low-Pass (High-Cut)
-                lowpassFilter = audioContext.createBiquadFilter();
-                lowpassFilter.type = "lowpass";
-                lowpassFilter.frequency.value = parseInt(lowpassSlider.value);
-                
                 analyser = audioContext.createAnalyser();
-                analyser.fftSize = 2048; 
+                analyser.fftSize = 4096;
+                analyser.smoothingTimeConstant = 0.3;
                 
                 microphone = audioContext.createMediaStreamSource(stream);
+                microphone.connect(analyser);
                 
-                // 3. Сборка Цепочки: Микрофон -> HP-Filter -> LP-Filter -> Анализатор
-                microphone.connect(highpassFilter); 
-                highpassFilter.connect(lowpassFilter);
-                lowpassFilter.connect(analyser); // Анализатор получает только отфильтрованный звук
+                // Создаём процессор для анализа сырых данных (с проверкой поддержки)
+                try {
+                    const bufferSize = 4096;
+                    scriptProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1);
+                    
+                    // Подключаем микрофон к процессору
+                    microphone.connect(scriptProcessor);
+                    scriptProcessor.connect(audioContext.destination);
+                    
+                    // Обработка сырых audio данных
+                    scriptProcessor.onaudioprocess = function(event) {
+                        try {
+                            const inputData = event.inputBuffer.getChannelData(0);
+                            if (inputData && inputData.length > 0) {
+                                audioBuffer = Array.from(inputData);
+                            }
+                        } catch(e) {
+                            console.log("Ошибка при обработке audio: ", e);
+                        }
+                    };
+                } catch(e) {
+                    console.warn("ScriptProcessor не поддерживается: ", e);
+                }
 
                 isListening = true;
                 startBtn.style.display = 'none';
-                statusText.innerText = "Анализ запущен...";
+                statusText.innerText = "✓ Анализ запущен...";
                 
-                draw(); // Запуск цикла отрисовки и детекции
+                draw();
             } catch (err) {
                 console.error(err);
                 alert("Ошибка микрофона: " + err);
             }
+        }        // Функция для детекции частоты методом подсчёта нулевых переходов
+        function detectFrequency(buffer) {
+            if (!buffer || buffer.length < 100) return 0;
+            
+            try {
+                // Ищем частоту методом подсчёта нулевых переходов (ZCR)
+                let zeroCount = 0;
+                for (let i = 1; i < buffer.length; i++) {
+                    if ((buffer[i] >= 0 && buffer[i-1] < 0) || (buffer[i] < 0 && buffer[i-1] >= 0)) {
+                        zeroCount++;
+                    }
+                }
+                
+                // Частота примерно = количество переходов * sampleRate / 2 / длину буфера
+                if (audioContext && audioContext.sampleRate && buffer.length > 0) {
+                    const frequency = (zeroCount * audioContext.sampleRate) / (2 * buffer.length);
+                    return Math.max(0, frequency);
+                }
+            } catch(e) {
+                console.log("Ошибка в detectFrequency: ", e);
+            }
+            return 0;
         }
-
+        
+        // Функция для подсчёта RMS (энергии сигнала)
+        function calculateRMS(buffer) {
+            if (!buffer || buffer.length === 0) return 0;
+            
+            try {
+                let sum = 0;
+                for (let i = 0; i < buffer.length; i++) {
+                    sum += buffer[i] * buffer[i];
+                }
+                return Math.sqrt(sum / buffer.length);
+            } catch(e) {
+                console.log("Ошибка в calculateRMS: ", e);
+            }
+            return 0;
+        }
+        
         // --- ЦИКЛ ОТРИСОВКИ И ДЕТЕКЦИИ ---
         function draw() {
             if (!isListening) return;
             requestAnimationFrame(draw);
 
-            const bufferLength = analyser.frequencyBinCount;
-            const dataArray = new Uint8Array(bufferLength);
-            analyser.getByteFrequencyData(dataArray);
+            try {
+                // Получаем спектр для визуализации
+                const bufferLength = analyser.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+                analyser.getByteFrequencyData(dataArray);
 
-            // Отрисовка спектра
-            ctx.fillStyle = 'rgb(20, 20, 20)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+                // Отрисовка спектра
+                ctx.fillStyle = 'rgb(20, 20, 20)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            const barWidth = (canvas.width / bufferLength) * 2.5;
-            let barHeight;
-            let x = 0;
-            let maxVol = 0;
-            let maxIndex = 0;
-            let totalVol = 0;
+                const barWidth = (canvas.width / bufferLength) * 2.5;
+                let barHeight;
+                let x = 0;
+                let maxVol = 0;
+                let maxIndex = 0;
 
-            for(let i = 0; i < bufferLength; i++) {
-                barHeight = dataArray[i];
-                if (barHeight > maxVol) {
-                    maxVol = barHeight;
-                    maxIndex = i;
+                // Получаем диапазон частот
+                const nyquist = audioContext.sampleRate / 2;
+                const hzPerBin = nyquist / bufferLength;
+                const highpassFreq = parseInt(highpassSlider.value);
+                const lowpassFreq = parseInt(lowpassSlider.value);
+                const startBin = Math.max(0, Math.round(highpassFreq / hzPerBin));
+                const endBin = Math.min(bufferLength - 1, Math.round(lowpassFreq / hzPerBin));
+
+                let filteredMaxVol = 0;
+                let filteredTotalVol = 0;
+                let filteredBinCount = 0;
+
+                for(let i = 0; i < bufferLength; i++) {
+                    barHeight = dataArray[i];
+                    
+                    if (barHeight > maxVol) {
+                        maxVol = barHeight;
+                        maxIndex = i;
+                    }
+
+                    if (i >= startBin && i <= endBin) {
+                        if (barHeight > filteredMaxVol) {
+                            filteredMaxVol = barHeight;
+                        }
+                        filteredTotalVol += barHeight;
+                        filteredBinCount++;
+                        ctx.fillStyle = 'rgb(' + Math.min(barHeight + 100, 255) + ',220,80)';
+                    } else {
+                        ctx.fillStyle = 'rgb(' + Math.min(barHeight + 30, 200) + ',100,30)';
+                    }
+                    
+                    ctx.fillRect(x, canvas.height - barHeight / 2, barWidth, barHeight / 2);
+                    x += barWidth + 1;
                 }
-                totalVol += barHeight;
 
-                // Рисуем бары
-                ctx.fillStyle = 'rgb(' + (barHeight + 50) + ',150,50)';
-                ctx.fillRect(x, canvas.height - barHeight / 2, barWidth, barHeight / 2);
+                const dominantHz = Math.round(maxIndex * hzPerBin);
 
-                x += barWidth + 1;
-            }
+                if (maxVol > 30) {
+                    peakHzDisplay.innerText = dominantHz + " Hz";
+                } else {
+                    peakHzDisplay.innerText = "...";
+                }
 
-            // Вычисление Пиковой частоты
-            const nyquist = audioContext.sampleRate / 2;
-            const hzPerBin = nyquist / bufferLength;
-            const dominantHz = Math.round(maxIndex * hzPerBin);
+                // Анализ во временной области
+                const currentFrequency = detectFrequency(audioBuffer);
+                const rmsEnergy = calculateRMS(audioBuffer);
+                
+                // Визуализация на основе спектра в отфильтрованной полосе
+                let visualVol = (filteredMaxVol / 255) * 100;
+                if (visualVol > 100) visualVol = 100;
+                
+                volumeBar.style.width = visualVol + '%';
 
-            if (maxVol > 30) {
-                peakHzDisplay.innerText = dominantHz + " Hz";
-            } else {
-                peakHzDisplay.innerText = "...";
-            }
+                let threshold = parseInt(thresholdSlider.value);
+                let now = Date.now();
 
-            // Логика счетчика (основана на средней громкости уже ОТФИЛЬТРОВАННОГО сигнала)
-            let averageVol = totalVol / bufferLength;
-            let visualVol = averageVol * 3;
-            if (visualVol > 100) visualVol = 100;
-            
-            volumeBar.style.width = visualVol + '%';
-
-            let threshold = parseInt(thresholdSlider.value);
-            let now = Date.now();
-
-            if (visualVol > threshold && (now - lastClapTime > COOLDOWN)) {
-                triggerCount();
-                lastClapTime = now;
+                // ДЕТЕКЦИЯ: Проверяем ОБОИХ условия:
+                // 1. Детектированная частота в установленном диапазоне
+                // 2. Энергия выше порога
+                
+                const thresholdValue = threshold * 2.55;
+                const isFrequencyInRange = currentFrequency >= highpassFreq && currentFrequency <= lowpassFreq;
+                const isEnergyHigh = rmsEnergy > (threshold / 100) * 0.05;
+                
+                if (isFrequencyInRange && isEnergyHigh && (now - lastClapTime > COOLDOWN)) {
+                    triggerCount();
+                    lastClapTime = now;
+                }
+            } catch(e) {
+                console.error("Ошибка в draw: ", e);
             }
         }
 
