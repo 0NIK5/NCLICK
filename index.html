@@ -3,408 +3,593 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Анализатор Эспандера v3 (Band-Pass)</title>
+    <title>NCLICK — Счётчик Эспандера</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; text-align: center; background: #222; color: #eee; display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; padding: 5px; }
-        
-        /* Счетчик */
-        .counter-box { font-size: 24px; font-weight: bold; color: #fff; margin: 2px 0; }
-        .counter-box.limit { color: #e74c3c; text-shadow: 0 0 20px red; }
+        * {
+            box-sizing: border-box;
+            font-family: Tahoma, 'MS Sans Serif', Arial, sans-serif;
+            font-size: 11px;
+        }
 
-        /* Контейнер настроек */
-        .panel { background: #333; padding: 8px; border-radius: 8px; width: 95%; max-width: 600px; margin-bottom: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
-        
-        canvas { background: #000; border-radius: 4px; width: 100%; height: 90px; border: 1px solid #444; display: block; }
+        body {
+            background: #3a6ea5;
+            margin: 0;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
 
-        .info-row { display: flex; justify-content: space-between; font-size: 12px; color: #aaa; margin-bottom: 3px; }
-        .peak-hz { color: #00ff00; font-weight: bold; }
+        /* --- WINDOW --- */
+        .window {
+            background: #d4d0c8;
+            border: 2px solid;
+            border-color: #ffffff #808080 #808080 #ffffff;
+            box-shadow: 2px 2px 6px rgba(0,0,0,0.5);
+            width: 100%;
+            max-width: 520px;
+            margin-bottom: 8px;
+        }
 
-        .controls-row { display: flex; align-items: center; justify-content: space-between; margin-top: 5px; }
-        input[type="range"] { flex-grow: 1; margin: 0 8px; cursor: pointer; }
-        
-        button { padding: 6px 12px; font-size: 13px; border: none; border-radius: 5px; cursor: pointer; color: white; margin-top: 5px;}
-        .btn-start { background: #27ae60; width: 100%; }
-        .btn-reset { background: #555;  }
-        
-        .status { margin-top: 5px; color: #888; font-size: 11px; }
-        
-        h2 { margin: 1px 0; }
-        h3 { margin: 1px 0; }
+        .title-bar {
+            background: linear-gradient(to right, #0a246a 0%, #3b72c8 60%, #a6caf0 100%);
+            color: #ffffff;
+            padding: 3px 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            font-size: 12px;
+            user-select: none;
+        }
+
+        .title-bar-buttons {
+            display: flex;
+            gap: 2px;
+        }
+
+        .title-bar-buttons button {
+            width: 16px;
+            height: 14px;
+            font-size: 9px;
+            padding: 0;
+            background: #d4d0c8;
+            border: 1px solid;
+            border-color: #ffffff #808080 #808080 #ffffff;
+            cursor: default;
+            color: #000;
+            line-height: 1;
+        }
+
+        .window-content {
+            padding: 8px 10px;
+        }
+
+        /* --- COUNTER --- */
+        .counter-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 4px 0 6px;
+        }
+
+        .counter-label {
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .counter-display {
+            font-family: 'Courier New', monospace;
+            font-size: 52px;
+            font-weight: bold;
+            color: #000080;
+            background: #ffffff;
+            border: 2px solid;
+            border-color: #808080 #ffffff #ffffff #808080;
+            padding: 4px 20px;
+            min-width: 130px;
+            text-align: center;
+            letter-spacing: 4px;
+        }
+
+        .counter-display.limit {
+            color: #cc0000;
+            animation: blink 0.4s step-end infinite;
+        }
+
+        @keyframes blink { 50% { opacity: 0; } }
+
+        /* --- CANVAS --- */
+        canvas {
+            width: 100%;
+            height: 80px;
+            border: 2px solid;
+            border-color: #808080 #ffffff #ffffff #808080;
+            background: #000;
+            display: block;
+        }
+
+        /* --- GROUPBOX --- */
+        .groupbox {
+            border: 1px solid;
+            border-color: #808080 #ffffff #ffffff #808080;
+            padding: 10px 8px 8px;
+            margin: 8px 0 4px;
+            position: relative;
+        }
+
+        .groupbox-label {
+            position: absolute;
+            top: -8px;
+            left: 8px;
+            background: #d4d0c8;
+            padding: 0 3px;
+            font-weight: bold;
+        }
+
+        /* --- ROWS --- */
+        .row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 3px 0;
+        }
+
+        .row-center {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 6px;
+            margin: 3px 0;
+        }
+
+        /* --- VALUE BADGE --- */
+        .value-badge {
+            background: #ffffff;
+            border: 1px solid;
+            border-color: #808080 #ffffff #ffffff #808080;
+            padding: 1px 6px;
+            min-width: 68px;
+            text-align: right;
+            font-weight: bold;
+        }
+
+        .value-badge.green { color: #006400; }
+        .value-badge.red   { color: #8b0000; }
+
+        /* --- INPUTS --- */
+        input[type="range"] {
+            flex-grow: 1;
+            margin: 0 6px;
+            accent-color: #0a246a;
+            cursor: pointer;
+        }
+
+        input[type="number"] {
+            background: #ffffff;
+            border: 2px solid;
+            border-color: #808080 #ffffff #ffffff #808080;
+            padding: 2px 4px;
+            width: 55px;
+            font-family: Tahoma;
+            font-size: 11px;
+            text-align: center;
+        }
+
+        /* --- BUTTONS --- */
+        button.xp {
+            background: #d4d0c8;
+            border: 2px solid;
+            border-color: #ffffff #808080 #808080 #ffffff;
+            padding: 4px 10px;
+            cursor: pointer;
+            font-family: Tahoma;
+            font-size: 11px;
+            flex: 1;
+        }
+
+        button.xp:active {
+            border-color: #808080 #ffffff #ffffff #808080;
+        }
+
+        button.xp.primary {
+            font-weight: bold;
+        }
+
+        /* --- PROGRESS BAR --- */
+        .progress-container {
+            background: #ffffff;
+            border: 2px solid;
+            border-color: #808080 #ffffff #ffffff #808080;
+            height: 16px;
+            position: relative;
+            margin: 4px 0;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: #000080;
+            transition: width 0.05s;
+        }
+
+        .threshold-marker {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #cc0000;
+            z-index: 2;
+        }
+
+        /* --- STATUS BAR --- */
+        .status-bar {
+            background: #d4d0c8;
+            border-top: 1px solid #808080;
+            padding: 2px 6px;
+            display: flex;
+            gap: 3px;
+        }
+
+        .status-panel {
+            border: 1px solid;
+            border-color: #808080 #ffffff #ffffff #808080;
+            padding: 1px 6px;
+            flex: 1;
+            color: #000;
+        }
+
+        /* --- SEPARATOR --- */
+        .sep {
+            border: none;
+            border-top: 1px solid #808080;
+            border-bottom: 1px solid #ffffff;
+            margin: 6px 0;
+        }
+
+        /* --- LABEL ROW for spectrum --- */
+        .spec-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 3px;
+            color: #444;
+        }
+
+        .peak-hz { color: #000080; font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <h2>NCLICK</h2>
+<!-- COUNTER WINDOW -->
+<div class="window">
+    <div class="title-bar">
+        <span>&#128279; NCLICK — Счётчик Эспандера v4</span>
+        <div class="title-bar-buttons">
+            <button>_</button>
+            <button>&#9633;</button>
+            <button>&#10005;</button>
+        </div>
+    </div>
+    <div class="window-content">
+        <div class="counter-wrap">
+            <div class="counter-label">Повторений:</div>
+            <div class="counter-display" id="counterDisplay">0</div>
+        </div>
+    </div>
+</div>
 
-    <div class="counter-box" id="counterDisplay">0</div>
-
-    <div class="panel">
-        <div class="info-row">
-            <span>Басы (Low)</span>
-            <span>Спектр звука</span>
-            <span>Высокие (High)</span>
+<!-- SPECTRUM WINDOW -->
+<div class="window">
+    <div class="title-bar">
+        <span>&#128266; Спектр звука</span>
+    </div>
+    <div class="window-content">
+        <div class="spec-labels">
+            <span>Низкие</span>
+            <span>Пиковая частота: <span class="peak-hz" id="peakHzDisplay">— Hz</span></span>
+            <span>Высокие</span>
         </div>
         <canvas id="spectrumCanvas"></canvas>
-        <div class="info-row" style="margin-top: 5px;">
-            <span>Пиковая частота (Max Hz): <span class="peak-hz" id="peakHzDisplay">0 Hz</span></span>
+    </div>
+</div>
+
+<!-- FILTER WINDOW -->
+<div class="window">
+    <div class="title-bar">
+        <span>&#9881; Частотный фильтр (Band-Pass)</span>
+    </div>
+    <div class="window-content">
+
+        <div class="groupbox">
+            <span class="groupbox-label">1. Нижняя граница (Low-Cut)</span>
+            <div class="row">
+                <span>100 Hz</span>
+                <input type="range" id="highpassSlider" min="100" max="15000" step="100" value="2100">
+                <span>15000 Hz</span>
+                <span class="value-badge green" id="lowcutHzVal">2100 Hz</span>
+            </div>
+        </div>
+
+        <div class="groupbox">
+            <span class="groupbox-label">2. Верхняя граница (High-Cut)</span>
+            <div class="row">
+                <span>2000 Hz</span>
+                <input type="range" id="lowpassSlider" min="2000" max="20000" step="100" value="5000">
+                <span>20000 Hz</span>
+                <span class="value-badge red" id="highcutHzVal">5000 Hz</span>
+            </div>
+        </div>
+
+        <div id="filterStatus" style="margin-top: 4px; color: #444;">
+            Счётчик реагирует только на звук между этими двумя частотами.
         </div>
     </div>
+</div>
 
-    <div class="panel">
-        <h3>Настройка Частотного Диапазона (Band-Pass)</h3>
-        
-        <div class="info-row" style="color:#2ecc71; margin-top: 10px;">
-            <span>**1. НИЖНЯЯ ГРАНИЦА (Low-Cut Filter)**</span>
-            <span id="lowcutHzVal">2100 Hz</span>
+<!-- SENSITIVITY WINDOW -->
+<div class="window">
+    <div class="title-bar">
+        <span>&#127922; Чувствительность</span>
+    </div>
+    <div class="window-content">
+        <div class="row">
+            <span>Порог обнаружения:</span>
+            <span class="value-badge" id="thresholdVal">30</span>
         </div>
-        <div class="controls-row">
-            <span>100 Hz</span>
-            <input type="range" id="highpassSlider" min="100" max="15000" step="100" value="2100" oninput="updateFilters()">
-            <span>15000 Hz</span>
+        <div class="row">
+            <span>Низкий</span>
+            <input type="range" id="thresholdSlider" min="1" max="100" value="30">
+            <span>Высокий</span>
         </div>
-        
-        <div class="info-row" style="color:#e74c3c; margin-top: 15px;">
-            <span>**2. ВЕРХНЯЯ ГРАНИЦА (High-Cut Filter)**</span>
-            <span id="highcutHzVal">5000 Hz</span>
-        </div>
-        <div class="controls-row">
-            <span>2000 Hz</span>
-            <input type="range" id="lowpassSlider" min="2000" max="20000" step="100" value="5000" oninput="updateFilters()">
-            <span>20000 Hz</span>
-        </div>
-        
-        <div class="status" style="margin-top: 10px;">
-            Счетчик будет реагировать только на звук **между** этими двумя частотами.
+        <div style="margin-top:6px; margin-bottom:2px;">Уровень сигнала в полосе:</div>
+        <div class="progress-container">
+            <div class="progress-bar" id="currentVolumeBar" style="width:0%"></div>
+            <div class="threshold-marker" id="thresholdMarker" style="left:30%"></div>
         </div>
     </div>
-    
-    <div class="panel">
-        <h3>Настройка Громкости</h3>
-        <div class="info-row">
-            <span>3. Порог громкости (Чувствительность)</span>
-            <span id="thresholdVal">22</span>
+</div>
+
+<!-- CONTROLS WINDOW -->
+<div class="window">
+    <div class="title-bar">
+        <span>&#127919; Управление</span>
+    </div>
+    <div class="window-content">
+        <div class="row">
+            <label>Цель повторений:</label>
+            <input type="number" id="targetInput" value="20" min="1" max="999">
         </div>
-        <div class="controls-row">
-            <span>0</span>
-            <input type="range" id="thresholdSlider" min="0" max="100" value="22">
-            <span>100</span>
-        </div>
-        
-        <div style="margin-top: 10px; height: 10px; background: #444; border-radius: 5px; overflow: hidden; position: relative;">
-            <div id="currentVolumeBar" style="width: 0%; height: 100%; background: #3498db; transition: width 0.05s;"></div>
-            <div id="thresholdMarker" style="position: absolute; left: 22%; top: 0; bottom: 0; width: 2px; background: #e74c3c; z-index: 2;"></div>
+        <hr class="sep">
+        <div class="row-center">
+            <button class="xp primary" id="startBtn" onclick="initAudio()">&#9654; Включить микрофон</button>
+            <button class="xp" onclick="stopListening()">&#9632; Стоп</button>
+            <button class="xp" onclick="resetCounter()">&#8635; Сброс</button>
         </div>
     </div>
-
-    <div class="panel">
-        <label>Цель повторений: <input type="number" id="targetInput" value="20" style="width: 50px; text-align: center; background: #444; color: white; border: none; padding: 5px;"></label>
-        <br>
-        <button class="btn-start" id="startBtn" onclick="initAudio()">▶ Включить микрофон</button>
-        <button class="btn-reset" onclick="resetCounter()" style="width: 100%; margin-top: 5px;">Сброс счетчика</button>
-        <button class="btn-reset" onclick="isListening = false; startBtn.style.display = 'block';" style="width: 100%; margin-top: 5px;">Stop</button>
-        
-        <div class="status" id="statusText">Ожидание...</div>
+    <div class="status-bar">
+        <div class="status-panel" id="statusText">Ожидание...</div>
     </div>
+</div>
 
-    <script>
-        let audioContext;
-        let analyser;
-        let microphone;
-        let scriptProcessor;
-        let isListening = false;
-        
-        let count = 0;
-        let lastClapTime = 0;
-        const COOLDOWN = 600;
-        
-        // Для анализа во временной области
-        let audioBuffer = [];
-        let detectedFrequency = 0;
+<script>
+    let audioContext, analyser, microphone;
+    let isListening = false;
 
-        // UI Элементы
-        const canvas = document.getElementById('spectrumCanvas');
-        const ctx = canvas.getContext('2d');
-        const peakHzDisplay = document.getElementById('peakHzDisplay');
-        const counterDisplay = document.getElementById('counterDisplay');
-        const volumeBar = document.getElementById('currentVolumeBar');
-        
-        const highpassSlider = document.getElementById('highpassSlider');
-        const lowpassSlider = document.getElementById('lowpassSlider');
-        const lowcutHzVal = document.getElementById('lowcutHzVal');
-        const highcutHzVal = document.getElementById('highcutHzVal');
+    let count = 0;
+    let lastClapTime = 0;
+    const COOLDOWN = 333;
 
-        const thresholdSlider = document.getElementById('thresholdSlider');
-        const thresholdMarker = document.getElementById('thresholdMarker');
-        const thresholdVal = document.getElementById('thresholdVal');
+    // Onset detection state
+    let previousBandEnergy = 0;
 
-        const statusText = document.getElementById('statusText');
-        const startBtn = document.getElementById('startBtn');
-        const targetInput = document.getElementById('targetInput');
+    // UI refs
+    const canvas          = document.getElementById('spectrumCanvas');
+    const ctx             = canvas.getContext('2d');
+    const peakHzDisplay   = document.getElementById('peakHzDisplay');
+    const counterDisplay  = document.getElementById('counterDisplay');
+    const volumeBar       = document.getElementById('currentVolumeBar');
+    const highpassSlider  = document.getElementById('highpassSlider');
+    const lowpassSlider   = document.getElementById('lowpassSlider');
+    const lowcutHzVal     = document.getElementById('lowcutHzVal');
+    const highcutHzVal    = document.getElementById('highcutHzVal');
+    const thresholdSlider = document.getElementById('thresholdSlider');
+    const thresholdMarker = document.getElementById('thresholdMarker');
+    const thresholdVal    = document.getElementById('thresholdVal');
+    const statusText      = document.getElementById('statusText');
+    const startBtn        = document.getElementById('startBtn');
+    const targetInput     = document.getElementById('targetInput');
+    const filterStatus    = document.getElementById('filterStatus');
 
-        canvas.width = 600;
-        canvas.height = 90;
+    canvas.width  = 500;
+    canvas.height = 80;
 
-        // --- УПРАВЛЕНИЕ ПОЛЗУНКАМИ ---
+    // --- SLIDERS ---
 
-        // Обновление ползунка Порога Громкости
-        thresholdSlider.oninput = function() {
-            thresholdMarker.style.left = this.value + '%';
-            thresholdVal.innerText = this.value;
+    thresholdSlider.oninput = function () {
+        thresholdMarker.style.left = this.value + '%';
+        thresholdVal.innerText = this.value;
+    };
+
+    function updateFilters() {
+        let lo = parseInt(highpassSlider.value);
+        let hi = parseInt(lowpassSlider.value);
+
+        if (lo >= hi) {
+            lo = Math.max(100, hi - 1000);
+            highpassSlider.value = lo;
+            filterStatus.textContent = '⚠ Границы пересекаются! Автокоррекция.';
+            filterStatus.style.color = '#cc0000';
+        } else {
+            filterStatus.textContent = 'Счётчик реагирует только на звук между этими двумя частотами.';
+            filterStatus.style.color = '#444';
         }
 
-        // Обновление Частотных Фильтров
-        function updateFilters() {
-            let newHighpassFreq = parseInt(highpassSlider.value);
-            let newLowpassFreq = parseInt(lowpassSlider.value);
+        lowcutHzVal.innerText = lo + ' Hz';
+        highcutHzVal.innerText = hi + ' Hz';
+    }
 
-            // Проверка на корректность диапазона
-            if (newHighpassFreq >= newLowpassFreq) {
-                // Если нижняя граница >= верхней, скорректировать нижнюю
-                newHighpassFreq = newLowpassFreq - 1000;
-                if (newHighpassFreq < 100) newHighpassFreq = 100;
-                highpassSlider.value = newHighpassFreq;
-                
-                lowcutHzVal.style.color = '#e74c3c';
-                highcutHzVal.style.color = '#e74c3c';
-                statusText.innerText = "⚠️ Границы пересекаются! Автокоррекция...";
+    highpassSlider.oninput = updateFilters;
+    lowpassSlider.oninput  = updateFilters;
+
+    // --- AUDIO INIT ---
+
+    async function initAudio() {
+        if (isListening) return;
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = 4096;
+            analyser.smoothingTimeConstant = 0.15; // low smoothing = better transient response
+
+            microphone = audioContext.createMediaStreamSource(stream);
+            microphone.connect(analyser);
+
+            isListening = true;
+            previousBandEnergy = 0;
+            startBtn.style.display = 'none';
+            statusText.innerText = '✓ Анализ запущен...';
+
+            draw();
+        } catch (err) {
+            alert('Ошибка микрофона: ' + err);
+        }
+    }
+
+    function stopListening() {
+        isListening = false;
+        if (microphone) microphone.disconnect();
+        startBtn.style.display = '';
+        statusText.innerText = 'Остановлено.';
+        volumeBar.style.width = '0%';
+        peakHzDisplay.innerText = '— Hz';
+    }
+
+    // --- DRAW + ONSET DETECTION ---
+
+    function draw() {
+        if (!isListening) return;
+        requestAnimationFrame(draw);
+
+        const bufferLength = analyser.frequencyBinCount; // 2048
+        const dataArray    = new Uint8Array(bufferLength);
+        analyser.getByteFrequencyData(dataArray);
+
+        // Canvas clear
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const nyquist      = audioContext.sampleRate / 2;
+        const hzPerBin     = nyquist / bufferLength;
+        const highpassFreq = parseInt(highpassSlider.value);
+        const lowpassFreq  = parseInt(lowpassSlider.value);
+        const startBin     = Math.max(0, Math.round(highpassFreq / hzPerBin));
+        const endBin       = Math.min(bufferLength - 1, Math.round(lowpassFreq / hzPerBin));
+
+        const barWidth = (canvas.width / bufferLength) * 2.5;
+        let x = 0, maxVol = 0, maxIndex = 0;
+        let bandEnergySum = 0, bandBinCount = 0;
+
+        for (let i = 0; i < bufferLength; i++) {
+            const h = dataArray[i];
+
+            if (h > maxVol) { maxVol = h; maxIndex = i; }
+
+            if (i >= startBin && i <= endBin) {
+                // Active band — bright green (XP style)
+                bandEnergySum += h;
+                bandBinCount++;
+                const g = Math.min(h + 80, 255);
+                ctx.fillStyle = `rgb(0,${g},0)`;
             } else {
-                lowcutHzVal.style.color = '#2ecc71';
-                highcutHzVal.style.color = '#e74c3c';
-                if (isListening) statusText.innerText = "✓ Анализ запущен...";
+                // Outside band — dark gray
+                const v = Math.min(Math.round(h * 0.35), 90);
+                ctx.fillStyle = `rgb(${v},${v},${v})`;
             }
 
-            lowcutHzVal.innerText = newHighpassFreq + " Hz";
-            highcutHzVal.innerText = newLowpassFreq + " Hz";
-        }
-        highpassSlider.oninput = updateFilters;
-        lowpassSlider.oninput = updateFilters;
-
-        // --- ИНИЦИАЛИЗАЦИЯ АУДИО ---
-
-        async function initAudio() {
-            if (isListening) return;
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                
-                analyser = audioContext.createAnalyser();
-                analyser.fftSize = 4096;
-                analyser.smoothingTimeConstant = 0.3;
-                
-                microphone = audioContext.createMediaStreamSource(stream);
-                microphone.connect(analyser);
-                
-                // Создаём процессор для анализа сырых данных (с проверкой поддержки)
-                try {
-                    const bufferSize = 4096;
-                    scriptProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1);
-                    
-                    // Подключаем микрофон к процессору
-                    microphone.connect(scriptProcessor);
-                    scriptProcessor.connect(audioContext.destination);
-                    
-                    // Обработка сырых audio данных
-                    scriptProcessor.onaudioprocess = function(event) {
-                        try {
-                            const inputData = event.inputBuffer.getChannelData(0);
-                            if (inputData && inputData.length > 0) {
-                                audioBuffer = Array.from(inputData);
-                            }
-                        } catch(e) {
-                            console.log("Ошибка при обработке audio: ", e);
-                        }
-                    };
-                } catch(e) {
-                    console.warn("ScriptProcessor не поддерживается: ", e);
-                }
-
-                isListening = true;
-                startBtn.style.display = 'none';
-                statusText.innerText = "✓ Анализ запущен...";
-                
-                draw();
-            } catch (err) {
-                console.error(err);
-                alert("Ошибка микрофона: " + err);
-            }
-        }        // Функция для детекции частоты методом подсчёта нулевых переходов
-        function detectFrequency(buffer) {
-            if (!buffer || buffer.length < 100) return 0;
-            
-            try {
-                // Ищем частоту методом подсчёта нулевых переходов (ZCR)
-                let zeroCount = 0;
-                for (let i = 1; i < buffer.length; i++) {
-                    if ((buffer[i] >= 0 && buffer[i-1] < 0) || (buffer[i] < 0 && buffer[i-1] >= 0)) {
-                        zeroCount++;
-                    }
-                }
-                
-                // Частота примерно = количество переходов * sampleRate / 2 / длину буфера
-                if (audioContext && audioContext.sampleRate && buffer.length > 0) {
-                    const frequency = (zeroCount * audioContext.sampleRate) / (2 * buffer.length);
-                    return Math.max(0, frequency);
-                }
-            } catch(e) {
-                console.log("Ошибка в detectFrequency: ", e);
-            }
-            return 0;
-        }
-        
-        // Функция для подсчёта RMS (энергии сигнала)
-        function calculateRMS(buffer) {
-            if (!buffer || buffer.length === 0) return 0;
-            
-            try {
-                let sum = 0;
-                for (let i = 0; i < buffer.length; i++) {
-                    sum += buffer[i] * buffer[i];
-                }
-                return Math.sqrt(sum / buffer.length);
-            } catch(e) {
-                console.log("Ошибка в calculateRMS: ", e);
-            }
-            return 0;
-        }
-        
-        // --- ЦИКЛ ОТРИСОВКИ И ДЕТЕКЦИИ ---
-        function draw() {
-            if (!isListening) return;
-            requestAnimationFrame(draw);
-
-            try {
-                // Получаем спектр для визуализации
-                const bufferLength = analyser.frequencyBinCount;
-                const dataArray = new Uint8Array(bufferLength);
-                analyser.getByteFrequencyData(dataArray);
-
-                // Отрисовка спектра
-                ctx.fillStyle = 'rgb(20, 20, 20)';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-                const barWidth = (canvas.width / bufferLength) * 2.5;
-                let barHeight;
-                let x = 0;
-                let maxVol = 0;
-                let maxIndex = 0;
-
-                // Получаем диапазон частот
-                const nyquist = audioContext.sampleRate / 2;
-                const hzPerBin = nyquist / bufferLength;
-                const highpassFreq = parseInt(highpassSlider.value);
-                const lowpassFreq = parseInt(lowpassSlider.value);
-                const startBin = Math.max(0, Math.round(highpassFreq / hzPerBin));
-                const endBin = Math.min(bufferLength - 1, Math.round(lowpassFreq / hzPerBin));
-
-                let filteredMaxVol = 0;
-                let filteredTotalVol = 0;
-                let filteredBinCount = 0;
-
-                for(let i = 0; i < bufferLength; i++) {
-                    barHeight = dataArray[i];
-                    
-                    if (barHeight > maxVol) {
-                        maxVol = barHeight;
-                        maxIndex = i;
-                    }
-
-                    if (i >= startBin && i <= endBin) {
-                        if (barHeight > filteredMaxVol) {
-                            filteredMaxVol = barHeight;
-                        }
-                        filteredTotalVol += barHeight;
-                        filteredBinCount++;
-                        ctx.fillStyle = 'rgb(' + Math.min(barHeight + 100, 255) + ',220,80)';
-                    } else {
-                        ctx.fillStyle = 'rgb(' + Math.min(barHeight + 30, 200) + ',100,30)';
-                    }
-                    
-                    ctx.fillRect(x, canvas.height - barHeight / 2, barWidth, barHeight / 2);
-                    x += barWidth + 1;
-                }
-
-                const dominantHz = Math.round(maxIndex * hzPerBin);
-
-                if (maxVol > 30) {
-                    peakHzDisplay.innerText = dominantHz + " Hz";
-                } else {
-                    peakHzDisplay.innerText = "...";
-                }
-
-                // Анализ во временной области
-                const currentFrequency = detectFrequency(audioBuffer);
-                const rmsEnergy = calculateRMS(audioBuffer);
-                
-                // Визуализация на основе спектра в отфильтрованной полосе
-                let visualVol = (filteredMaxVol / 255) * 100;
-                if (visualVol > 100) visualVol = 100;
-                
-                volumeBar.style.width = visualVol + '%';
-
-                let threshold = parseInt(thresholdSlider.value);
-                let now = Date.now();
-
-                // ДЕТЕКЦИЯ: Проверяем ОБОИХ условия:
-                // 1. Детектированная частота в установленном диапазоне
-                // 2. Энергия выше порога
-                
-                const thresholdValue = threshold * 2.55;
-                const isFrequencyInRange = currentFrequency >= highpassFreq && currentFrequency <= lowpassFreq;
-                const isEnergyHigh = rmsEnergy > (threshold / 100) * 0.05;
-                
-                if (isFrequencyInRange && isEnergyHigh && (now - lastClapTime > COOLDOWN)) {
-                    triggerCount();
-                    lastClapTime = now;
-                }
-            } catch(e) {
-                console.error("Ошибка в draw: ", e);
-            }
+            ctx.fillRect(x, canvas.height - h / 2, barWidth, h / 2);
+            x += barWidth + 1;
         }
 
-        // --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
-        function triggerCount() {
-            count++;
-            counterDisplay.innerText = count;
-            
-            volumeBar.style.backgroundColor = '#fff';
-            setTimeout(() => volumeBar.style.backgroundColor = '#3498db', 100);
+        // Peak Hz display
+        peakHzDisplay.innerText = maxVol > 30
+            ? Math.round(maxIndex * hzPerBin) + ' Hz'
+            : '— Hz';
 
-            const target = parseInt(targetInput.value);
-            if (count >= target) {
-                counterDisplay.classList.add('limit');
-                statusText.innerText = "ЦЕЛЬ ДОСТИГНУТА! Смени руку.";
-                playBeep();            
-                resetCounter();
-            }
+        // Band energy average (0–255)
+        const currentBandEnergy = bandBinCount > 0
+            ? bandEnergySum / bandBinCount
+            : 0;
+
+        // Volume bar reflects band energy
+        volumeBar.style.width = Math.min((currentBandEnergy / 255) * 100, 100) + '%';
+
+        // --- ONSET DETECTION ---
+        // We detect a sudden RISE in band energy, not just "is it loud"
+        const energyDelta    = currentBandEnergy - previousBandEnergy;
+        const threshold      = parseInt(thresholdSlider.value);
+        // Map slider 1–100 to onset threshold ~0.8–80
+        const onsetThreshold = threshold * 0.8;
+
+        const now = Date.now();
+
+        if (
+            energyDelta      > onsetThreshold &&  // sudden rise
+            currentBandEnergy > 12             &&  // minimum absolute level (not silence)
+            (now - lastClapTime) > COOLDOWN
+        ) {
+            triggerCount();
+            lastClapTime = now;
         }
 
-        function resetCounter() {
-            count = 0;
-            counterDisplay.innerText = "0";
-            counterDisplay.classList.remove('limit');
-            statusText.innerText = "Счетчик сброшен";
-        }
+        // Smooth decay — releases quickly so next click is detectable
+        previousBandEnergy = currentBandEnergy * 0.55 + previousBandEnergy * 0.45;
+    }
 
-        function playBeep() {
-            if (!audioContext) return;
+    // --- COUNTER ---
+
+    function triggerCount() {
+        count++;
+        counterDisplay.innerText = count;
+
+        // Flash volume bar white
+        volumeBar.style.backgroundColor = '#ffffff';
+        setTimeout(() => { volumeBar.style.backgroundColor = '#000080'; }, 120);
+
+        const target = parseInt(targetInput.value);
+        if (count >= target) {
+            counterDisplay.classList.add('limit');
+            statusText.innerText = '🎯 ЦЕЛЬ ДОСТИГНУТА! Смени руку.';
+            playBeep();
+            setTimeout(resetCounter, 1800);
+        }
+    }
+
+    function resetCounter() {
+        count = 0;
+        counterDisplay.innerText = '0';
+        counterDisplay.classList.remove('limit');
+        if (isListening) statusText.innerText = '✓ Анализ запущен...';
+        else statusText.innerText = 'Счётчик сброшен.';
+    }
+
+    // Two short beeps — classic notification
+    function playBeep() {
+        if (!audioContext) return;
+        [0, 0.32].forEach(delay => {
             const osc = audioContext.createOscillator();
-            const g = audioContext.createGain();
+            const g   = audioContext.createGain();
             osc.connect(g);
             g.connect(audioContext.destination);
-            osc.frequency.value = 1507;// Частота для сигнала "Цель достигнута"
-            osc.start();
-            g.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 2.5);
-            osc.stop(audioContext.currentTime + 2.5);
-        }
-    </script>
+            osc.frequency.value = 1480;
+            g.gain.setValueAtTime(0.5, audioContext.currentTime + delay);
+            g.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + delay + 0.22);
+            osc.start(audioContext.currentTime + delay);
+            osc.stop(audioContext.currentTime  + delay + 0.22);
+        });
+    }
+</script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
