@@ -193,8 +193,11 @@
             border-color: #808080 #ffffff #ffffff #808080;
         }
 
-        button.xp.primary {
-            font-weight: bold;
+        button.xp.primary { font-weight: bold; }
+
+        button.xp:disabled {
+            color: #808080;
+            cursor: default;
         }
 
         /* --- PROGRESS BAR --- */
@@ -223,6 +226,44 @@
             z-index: 2;
         }
 
+        /* --- TRAINING PANEL --- */
+        .training-count {
+            font-family: 'Courier New', monospace;
+            font-size: 28px;
+            font-weight: bold;
+            color: #000080;
+            text-align: center;
+            background: #ffffff;
+            border: 2px solid;
+            border-color: #808080 #ffffff #ffffff #808080;
+            padding: 2px 10px;
+            margin: 4px auto;
+            display: inline-block;
+        }
+
+        .training-progress {
+            background: #ffffff;
+            border: 2px solid;
+            border-color: #808080 #ffffff #ffffff #808080;
+            height: 14px;
+            margin: 4px 0;
+            overflow: hidden;
+        }
+
+        .training-progress-bar {
+            height: 100%;
+            background: #000080;
+            transition: width 0.2s;
+        }
+
+        .trained-msg {
+            color: #006400;
+            font-weight: bold;
+            font-size: 13px;
+            text-align: center;
+            padding: 4px 0;
+        }
+
         /* --- STATUS BAR --- */
         .status-bar {
             background: #d4d0c8;
@@ -248,7 +289,7 @@
             margin: 4px 0;
         }
 
-        /* --- LABEL ROW for spectrum --- */
+        /* --- SPECTRUM LABELS --- */
         .spec-labels {
             display: flex;
             justify-content: space-between;
@@ -257,6 +298,31 @@
         }
 
         .peak-hz { color: #000080; font-weight: bold; }
+
+        /* similarity meter */
+        .sim-meter-wrap {
+            margin-top: 4px;
+        }
+        .sim-bar-container {
+            background: #ffffff;
+            border: 2px solid;
+            border-color: #808080 #ffffff #ffffff #808080;
+            height: 10px;
+            position: relative;
+            overflow: hidden;
+        }
+        .sim-bar {
+            height: 100%;
+            background: #808000;
+            transition: width 0.08s;
+        }
+        .sim-threshold-marker {
+            position: absolute;
+            top: 0; bottom: 0;
+            width: 2px;
+            background: #cc0000;
+            z-index: 2;
+        }
     </style>
 </head>
 <body>
@@ -264,7 +330,7 @@
 <!-- COUNTER WINDOW -->
 <div class="window">
     <div class="title-bar">
-        <span>&#128279; NCLICK — Счётчик Эспандера v4</span>
+        <span>&#128279; NCLICK — Счётчик Эспандера v5</span>
         <div class="title-bar-buttons">
             <button>_</button>
             <button>&#9633;</button>
@@ -294,13 +360,45 @@
     </div>
 </div>
 
+<!-- TRAINING WINDOW -->
+<div class="window" id="trainingWindow">
+    <div class="title-bar">
+        <span>&#127979; Обучение</span>
+    </div>
+    <div class="window-content" id="trainingContent">
+        <div id="trainingIdle" style="text-align:center; color:#555; padding: 4px 0;">
+            Включите микрофон для начала обучения.
+        </div>
+        <div id="trainingActive" style="display:none;">
+            <div style="text-align:center; margin-bottom:4px; font-weight:bold;">
+                Сожмите эспандер <span id="trainingCountNeeded">10</span> раз:
+            </div>
+            <div style="text-align:center;">
+                <span class="training-count" id="trainingCountDone">0</span>
+                <span style="font-size:18px; font-weight:bold; vertical-align:middle;"> / 10</span>
+            </div>
+            <div class="training-progress">
+                <div class="training-progress-bar" id="trainingProgressBar" style="width:0%"></div>
+            </div>
+        </div>
+        <div id="trainingDone" style="display:none;">
+            <div class="trained-msg">&#10003; Обучен! Вперёд!</div>
+            <div style="text-align:center; color:#555; font-size:10px; margin-top:2px;">
+                Эталонов записано: 10
+            </div>
+        </div>
+    </div>
+    <div class="status-bar" id="retrainBar" style="display:none;">
+        <button class="xp" onclick="startRetraining()" style="flex:1;">&#8635; Переобучить</button>
+    </div>
+</div>
+
 <!-- FILTER WINDOW -->
 <div class="window">
     <div class="title-bar">
         <span>&#9881; Частотный фильтр (Band-Pass)</span>
     </div>
     <div class="window-content">
-
         <div class="groupbox">
             <span class="groupbox-label">1. Нижняя граница (Low-Cut)</span>
             <div class="row">
@@ -310,7 +408,6 @@
                 <span class="value-badge green" id="lowcutHzVal">2100 Hz</span>
             </div>
         </div>
-
         <div class="groupbox">
             <span class="groupbox-label">2. Верхняя граница (High-Cut)</span>
             <div class="row">
@@ -320,7 +417,6 @@
                 <span class="value-badge red" id="highcutHzVal">5000 Hz</span>
             </div>
         </div>
-
         <div id="filterStatus" style="margin-top: 4px; color: #444;">
             Счётчик реагирует только на звук между этими двумя частотами.
         </div>
@@ -330,22 +426,29 @@
 <!-- SENSITIVITY WINDOW -->
 <div class="window">
     <div class="title-bar">
-        <span>&#127922; Чувствительность</span>
+        <span>&#127922; Чувствительность (порог сходства)</span>
     </div>
     <div class="window-content">
         <div class="row">
-            <span>Порог обнаружения:</span>
+            <span>Порог сходства с эталоном:</span>
             <span class="value-badge" id="thresholdVal">30</span>
         </div>
         <div class="row">
-            <span>Низкий</span>
+            <span>Мягко</span>
             <input type="range" id="thresholdSlider" min="1" max="100" value="30">
-            <span>Высокий</span>
+            <span>Строго</span>
         </div>
-        <div style="margin-top:6px; margin-bottom:2px;">Уровень сигнала в полосе:</div>
+        <div style="margin-top:5px; margin-bottom:2px;">Уровень сигнала в полосе:</div>
         <div class="progress-container">
             <div class="progress-bar" id="currentVolumeBar" style="width:0%"></div>
             <div class="threshold-marker" id="thresholdMarker" style="left:30%"></div>
+        </div>
+        <div class="sim-meter-wrap" id="simMeterWrap" style="display:none;">
+            <div style="margin-bottom:2px;">Сходство с эталоном:</div>
+            <div class="sim-bar-container">
+                <div class="sim-bar" id="simBar" style="width:0%"></div>
+                <div class="sim-threshold-marker" id="simThresholdMarker" style="left:30%"></div>
+            </div>
         </div>
     </div>
 </div>
@@ -362,10 +465,16 @@
         </div>
         <hr class="sep">
         <div class="row-center">
-            <button class="xp primary" id="startBtn" onclick="initAudio()">&#9654; Включить микрофон</button>
-            <button class="xp" onclick="stopListening()">&#9632; Стоп</button>
-            <button class="xp" onclick="resetCounter()">&#8635; Сброс</button>
+            <button class="xp primary" id="startBtn" onclick="initAudio()" style="flex:1;">&#9654; Включить микрофон</button>
+            <button class="xp" onclick="stopListening()" style="flex:1;">&#9632; Стоп</button>
+            <button class="xp" onclick="resetCounter()" style="flex:1;">&#8635; Сброс счётчика</button>
         </div>
+        <hr class="sep">
+        <div class="row-center">
+            <button class="xp" id="logBtn" onclick="toggleLog()" style="flex:1;">&#128190; Начать запись лога</button>
+            <button class="xp" id="downloadBtn" onclick="downloadLog()" style="flex:1;" disabled>&#11015; Скачать лог</button>
+        </div>
+        <div id="logStatus" style="margin-top:4px; color:#555; text-align:center;"></div>
     </div>
     <div class="status-bar">
         <div class="status-panel" id="statusText">Ожидание...</div>
@@ -373,33 +482,60 @@
 </div>
 
 <script>
+    // --- STATE ---
+    const STATE_IDLE      = 'idle';
+    const STATE_TRAINING  = 'training';
+    const STATE_DETECTING = 'detecting';
+
+    let appState = STATE_IDLE;
+    let referenceSnapshots = [];   // массив из 10 Float32Array (полный FFT)
+    const TRAINING_TOTAL = 10;
+
     let audioContext, analyser, microphone;
     let isListening = false;
 
     let count = 0;
-    let lastClapTime = 0;
+    let lastEventTime = 0;
     const COOLDOWN = 333;
 
     // Onset detection state
     let previousBandEnergy = 0;
+    const ONSET_FIXED_THRESHOLD = 3; // порог скачка энергии для поимки звука
+
+    // Decay check — отсеиваем голос и устойчивые звуки
+    let pendingOnset = null;       // { snap, energy, time, isTraining }
+    const DECAY_CHECK_MS = 80;    // ждём 80ms после onset
+    const DECAY_RATIO    = 0.82;  // энергия должна упасть до < 82% — иначе не щелчок
+
+    // Last similarity for meter display
+    let lastSimilarity = 0;
 
     // UI refs
-    const canvas          = document.getElementById('spectrumCanvas');
-    const ctx             = canvas.getContext('2d');
-    const peakHzDisplay   = document.getElementById('peakHzDisplay');
-    const counterDisplay  = document.getElementById('counterDisplay');
-    const volumeBar       = document.getElementById('currentVolumeBar');
-    const highpassSlider  = document.getElementById('highpassSlider');
-    const lowpassSlider   = document.getElementById('lowpassSlider');
-    const lowcutHzVal     = document.getElementById('lowcutHzVal');
-    const highcutHzVal    = document.getElementById('highcutHzVal');
-    const thresholdSlider = document.getElementById('thresholdSlider');
-    const thresholdMarker = document.getElementById('thresholdMarker');
-    const thresholdVal    = document.getElementById('thresholdVal');
-    const statusText      = document.getElementById('statusText');
-    const startBtn        = document.getElementById('startBtn');
-    const targetInput     = document.getElementById('targetInput');
-    const filterStatus    = document.getElementById('filterStatus');
+    const canvas               = document.getElementById('spectrumCanvas');
+    const ctx                  = canvas.getContext('2d');
+    const peakHzDisplay        = document.getElementById('peakHzDisplay');
+    const counterDisplay       = document.getElementById('counterDisplay');
+    const volumeBar            = document.getElementById('currentVolumeBar');
+    const highpassSlider       = document.getElementById('highpassSlider');
+    const lowpassSlider        = document.getElementById('lowpassSlider');
+    const lowcutHzVal          = document.getElementById('lowcutHzVal');
+    const highcutHzVal         = document.getElementById('highcutHzVal');
+    const thresholdSlider      = document.getElementById('thresholdSlider');
+    const thresholdMarker      = document.getElementById('thresholdMarker');
+    const thresholdVal         = document.getElementById('thresholdVal');
+    const statusText           = document.getElementById('statusText');
+    const startBtn             = document.getElementById('startBtn');
+    const targetInput          = document.getElementById('targetInput');
+    const filterStatus         = document.getElementById('filterStatus');
+    const trainingIdle         = document.getElementById('trainingIdle');
+    const trainingActive       = document.getElementById('trainingActive');
+    const trainingDone         = document.getElementById('trainingDone');
+    const trainingCountDone    = document.getElementById('trainingCountDone');
+    const trainingProgressBar  = document.getElementById('trainingProgressBar');
+    const retrainBar           = document.getElementById('retrainBar');
+    const simMeterWrap         = document.getElementById('simMeterWrap');
+    const simBar               = document.getElementById('simBar');
+    const simThresholdMarker   = document.getElementById('simThresholdMarker');
 
     canvas.width  = 500;
     canvas.height = 70;
@@ -409,7 +545,16 @@
     thresholdSlider.oninput = function () {
         thresholdMarker.style.left = this.value + '%';
         thresholdVal.innerText = this.value;
+        // Update similarity threshold marker
+        const simThresh = getSimThreshold();
+        simThresholdMarker.style.left = (simThresh * 100) + '%';
     };
+
+    function getSimThreshold() {
+        const v = parseInt(thresholdSlider.value);
+        // slider 1 → 0.55 (lenient), slider 100 → 0.97 (strict)
+        return 0.55 + (v / 100) * 0.42;
+    }
 
     function updateFilters() {
         let lo = parseInt(highpassSlider.value);
@@ -432,6 +577,44 @@
     highpassSlider.oninput = updateFilters;
     lowpassSlider.oninput  = updateFilters;
 
+    // --- TRAINING UI ---
+
+    function setTrainingUI(state) {
+        trainingIdle.style.display   = 'none';
+        trainingActive.style.display = 'none';
+        trainingDone.style.display   = 'none';
+        retrainBar.style.display     = 'none';
+        simMeterWrap.style.display   = 'none';
+
+        if (state === 'idle') {
+            trainingIdle.style.display = 'block';
+        } else if (state === 'active') {
+            trainingActive.style.display = 'block';
+            updateTrainingCounter(referenceSnapshots.length);
+        } else if (state === 'done') {
+            trainingDone.style.display = 'block';
+            retrainBar.style.display   = 'flex';
+            simMeterWrap.style.display = 'block';
+            // Set sim threshold marker
+            const simThresh = getSimThreshold();
+            simThresholdMarker.style.left = (simThresh * 100) + '%';
+        }
+    }
+
+    function updateTrainingCounter(n) {
+        trainingCountDone.innerText = n;
+        trainingProgressBar.style.width = (n / TRAINING_TOTAL * 100) + '%';
+    }
+
+    function startRetraining() {
+        referenceSnapshots = [];
+        appState = STATE_TRAINING;
+        setTrainingUI('active');
+        updateTrainingCounter(0);
+        previousBandEnergy = 0;
+        statusText.innerText = 'Обучение... сожмите эспандер 10 раз.';
+    }
+
     // --- AUDIO INIT ---
 
     async function initAudio() {
@@ -442,15 +625,21 @@
 
             analyser = audioContext.createAnalyser();
             analyser.fftSize = 4096;
-            analyser.smoothingTimeConstant = 0.15; // low smoothing = better transient response
+            analyser.smoothingTimeConstant = 0.15;
 
             microphone = audioContext.createMediaStreamSource(stream);
             microphone.connect(analyser);
 
             isListening = true;
             previousBandEnergy = 0;
+            referenceSnapshots = [];
+
             startBtn.style.display = 'none';
-            statusText.innerText = '✓ Анализ запущен...';
+
+            // Start training
+            appState = STATE_TRAINING;
+            setTrainingUI('active');
+            statusText.innerText = 'Обучение... сожмите эспандер 10 раз.';
 
             draw();
         } catch (err) {
@@ -460,20 +649,99 @@
 
     function stopListening() {
         isListening = false;
+        appState = STATE_IDLE;
         if (microphone) microphone.disconnect();
         startBtn.style.display = '';
+        setTrainingUI('idle');
         statusText.innerText = 'Остановлено.';
         volumeBar.style.width = '0%';
         peakHzDisplay.innerText = '— Hz';
     }
 
-    // --- DRAW + ONSET DETECTION ---
+    // --- LOGGING ---
+    let isLogging = false;
+    let logData   = [];
+    let logStart  = 0;
+
+    const logBtn      = document.getElementById('logBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const logStatus   = document.getElementById('logStatus');
+
+    function toggleLog() {
+        if (!isLogging) {
+            logData   = [];
+            logStart  = Date.now();
+            isLogging = true;
+            logBtn.innerText      = '⏹ Остановить запись';
+            downloadBtn.disabled  = true;
+            logStatus.style.color = '#cc0000';
+            logStatus.innerText   = '● Запись идёт...';
+        } else {
+            isLogging = false;
+            logBtn.innerText      = '💾 Начать запись лога';
+            downloadBtn.disabled  = logData.length === 0;
+            logStatus.style.color = '#006400';
+            logStatus.innerText   = `Записано событий: ${logData.length}`;
+        }
+    }
+
+    function log(type, data) {
+        if (!isLogging) return;
+        logData.push({ t: Date.now() - logStart, type, ...data });
+    }
+
+    function downloadLog() {
+        const text = JSON.stringify(logData, null, 2);
+        const blob = new Blob([text], { type: 'application/json' });
+        const a    = document.createElement('a');
+        a.href     = URL.createObjectURL(blob);
+        a.download = 'nclick_log.json';
+        a.click();
+    }
+
+    // --- SNAPSHOT & SIMILARITY ---
+
+    // Снимок полного FFT-спектра (нормализованный 0..1)
+    function captureSnapshot() {
+        const bufferLength = analyser.frequencyBinCount;
+        const raw = new Float32Array(bufferLength);
+        analyser.getFloatFrequencyData(raw); // dB: обычно -100..0
+        const snap = new Float32Array(bufferLength);
+        for (let i = 0; i < bufferLength; i++) {
+            snap[i] = Math.max(0, (raw[i] + 100) / 100);
+        }
+        return snap;
+    }
+
+    function cosineSimilarity(a, b) {
+        let dot = 0, magA = 0, magB = 0;
+        const len = Math.min(a.length, b.length);
+        for (let i = 0; i < len; i++) {
+            dot  += a[i] * b[i];
+            magA += a[i] * a[i];
+            magB += b[i] * b[i];
+        }
+        if (magA === 0 || magB === 0) return 0;
+        return dot / (Math.sqrt(magA) * Math.sqrt(magB));
+    }
+
+    // Максимальное сходство текущего снимка с любым из эталонов
+    function maxSimilarity(snap) {
+        let best = 0;
+        for (const ref of referenceSnapshots) {
+            const s = cosineSimilarity(snap, ref);
+            if (s > best) best = s;
+        }
+        return best;
+    }
+
+    // --- DRAW + DETECTION ---
 
     function draw() {
         if (!isListening) return;
         requestAnimationFrame(draw);
 
-        const bufferLength = analyser.frequencyBinCount; // 2048
+        const bufferLength = analyser.frequencyBinCount;
         const dataArray    = new Uint8Array(bufferLength);
         analyser.getByteFrequencyData(dataArray);
 
@@ -494,17 +762,14 @@
 
         for (let i = 0; i < bufferLength; i++) {
             const h = dataArray[i];
-
             if (h > maxVol) { maxVol = h; maxIndex = i; }
 
             if (i >= startBin && i <= endBin) {
-                // Active band — bright green (XP style)
                 bandEnergySum += h;
                 bandBinCount++;
                 const g = Math.min(h + 80, 255);
                 ctx.fillStyle = `rgb(0,${g},0)`;
             } else {
-                // Outside band — dark gray
                 const v = Math.min(Math.round(h * 0.35), 90);
                 ctx.fillStyle = `rgb(${v},${v},${v})`;
             }
@@ -513,38 +778,89 @@
             x += barWidth + 1;
         }
 
-        // Peak Hz display
         peakHzDisplay.innerText = maxVol > 30
             ? Math.round(maxIndex * hzPerBin) + ' Hz'
             : '— Hz';
 
-        // Band energy average (0–255)
-        const currentBandEnergy = bandBinCount > 0
-            ? bandEnergySum / bandBinCount
-            : 0;
-
-        // Volume bar reflects band energy
+        const currentBandEnergy = bandBinCount > 0 ? bandEnergySum / bandBinCount : 0;
         volumeBar.style.width = Math.min((currentBandEnergy / 255) * 100, 100) + '%';
 
-        // --- ONSET DETECTION ---
-        // We detect a sudden RISE in band energy, not just "is it loud"
-        const energyDelta    = currentBandEnergy - previousBandEnergy;
-        const threshold      = parseInt(thresholdSlider.value);
-        // Map slider 1–100 to onset threshold ~0.8–80
-        const onsetThreshold = threshold * 0.8;
-
-        const now = Date.now();
-
-        if (
-            energyDelta      > onsetThreshold &&  // sudden rise
-            currentBandEnergy > 12             &&  // minimum absolute level (not silence)
-            (now - lastClapTime) > COOLDOWN
-        ) {
-            triggerCount();
-            lastClapTime = now;
+        // Similarity bar (detecting mode)
+        if (appState === STATE_DETECTING) {
+            simBar.style.width = (lastSimilarity * 100) + '%';
         }
 
-        // Smooth decay — releases quickly so next click is detectable
+        const energyDelta = currentBandEnergy - previousBandEnergy;
+        const now = Date.now();
+
+        // --- ОБУЧЕНИЕ: onset → сразу записываем, без decay check ---
+        if (
+            appState === STATE_TRAINING &&
+            energyDelta > ONSET_FIXED_THRESHOLD &&
+            currentBandEnergy > 8 &&
+            (now - lastEventTime) > COOLDOWN
+        ) {
+            lastEventTime = now;
+            log('TRAIN_CLICK', { delta: +energyDelta.toFixed(2), energy: +currentBandEnergy.toFixed(2), n: referenceSnapshots.length + 1 });
+            referenceSnapshots.push(captureSnapshot());
+            updateTrainingCounter(referenceSnapshots.length);
+            if (referenceSnapshots.length >= TRAINING_TOTAL) {
+                appState = STATE_DETECTING;
+                setTrainingUI('done');
+                statusText.innerText = '✓ Анализ запущен...';
+            }
+        }
+
+        // --- ДЕТЕКЦИЯ: onset → отслеживаем пик → decay check ---
+        if (appState === STATE_DETECTING) {
+
+            if (pendingOnset) {
+                // Обновляем пик пока растёт энергия
+                if (currentBandEnergy > pendingOnset.peakEnergy) {
+                    pendingOnset.peakEnergy = currentBandEnergy;
+                    pendingOnset.peakSnap   = captureSnapshot();
+                }
+
+                // Decay check от момента onset
+                if ((now - pendingOnset.time) >= DECAY_CHECK_MS) {
+                    const decayRatio = currentBandEnergy / pendingOnset.peakEnergy;
+                    const passed     = decayRatio < DECAY_RATIO;
+                    log('DECAY_CHECK', {
+                        peakEnergy:  +pendingOnset.peakEnergy.toFixed(2),
+                        nowEnergy:   +currentBandEnergy.toFixed(2),
+                        decayRatio:  +decayRatio.toFixed(3),
+                        threshold:   DECAY_RATIO,
+                        passed
+                    });
+                    if (passed) {
+                        const sim       = maxSimilarity(pendingOnset.peakSnap);
+                        lastSimilarity  = sim;
+                        const simThresh = getSimThreshold();
+                        const counted   = sim >= simThresh;
+                        log('SIMILARITY', { sim: +sim.toFixed(4), simThresh: +simThresh.toFixed(4), counted });
+                        if (counted) triggerCount();
+                    }
+                    pendingOnset = null;
+                }
+            }
+
+            // Поймали новый скачок — начинаем отслеживание пика
+            if (
+                !pendingOnset &&
+                energyDelta > ONSET_FIXED_THRESHOLD &&
+                currentBandEnergy > 8 &&
+                (now - lastEventTime) > COOLDOWN
+            ) {
+                lastEventTime = now;
+                log('ONSET', { delta: +energyDelta.toFixed(2), energy: +currentBandEnergy.toFixed(2) });
+                pendingOnset = {
+                    time:        now,
+                    peakEnergy:  currentBandEnergy,
+                    peakSnap:    captureSnapshot()
+                };
+            }
+        }
+
         previousBandEnergy = currentBandEnergy * 0.55 + previousBandEnergy * 0.45;
     }
 
@@ -554,7 +870,6 @@
         count++;
         counterDisplay.innerText = count;
 
-        // Flash volume bar white
         volumeBar.style.backgroundColor = '#ffffff';
         setTimeout(() => { volumeBar.style.backgroundColor = '#000080'; }, 120);
 
@@ -571,11 +886,11 @@
         count = 0;
         counterDisplay.innerText = '0';
         counterDisplay.classList.remove('limit');
-        if (isListening) statusText.innerText = '✓ Анализ запущен...';
-        else statusText.innerText = 'Счётчик сброшен.';
+        if (isListening && appState === STATE_DETECTING) {
+            statusText.innerText = '✓ Анализ запущен...';
+        }
     }
 
-    // Two short beeps — classic notification
     function playBeep() {
         if (!audioContext) return;
         [0, 0.32].forEach(delay => {
