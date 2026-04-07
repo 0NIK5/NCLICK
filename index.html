@@ -898,8 +898,8 @@
             const g   = audioContext.createGain();
             osc.connect(g);
             g.connect(audioContext.destination);
-            osc.frequency.value = 1480;
-            g.gain.setValueAtTime(0.5, audioContext.currentTime + delay);
+            osc.frequency.value = 2777;//1480;
+            g.gain.setValueAtTime(0.7, audioContext.currentTime + delay);
             g.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + delay + 0.22);
             osc.start(audioContext.currentTime + delay);
             osc.stop(audioContext.currentTime  + delay + 0.22);
